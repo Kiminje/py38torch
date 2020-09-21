@@ -1,6 +1,6 @@
 from nltk.corpus import wordnet as wn
 q = wn.synsets('computer')[0].definition()
-
+#first hw1
 
 def definition(word):
     return wn.synsets(word)[0].definition()
