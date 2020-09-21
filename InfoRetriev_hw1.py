@@ -7,6 +7,8 @@ import gensim.models.word2vec as gs
 # 1. please change to appropriate directory
 sentences = Text8Corpus('/home/inje/anaconda3/\
 envs/py37torch/lib/python3.8/site-packages/gensim/models/text8')
+#   if using clone use the below
+#   sentences = Text8Corpus('text8')
 
 for sentence in sentences:
     #print(sentence[0:10]) #    uncomment to activate #1
