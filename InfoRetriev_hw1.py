@@ -1,12 +1,15 @@
 from nltk.corpus import wordnet as wn
+
 q = wn.synsets('computer')[0].definition()
-#first hw1
+
+
+# first hw1
 
 def definition(word):
     return wn.synsets(word)[0].definition()
 
-from gensim.models.word2vec import Text8Corpus
 
+from gensim.models.word2vec import Text8Corpus
 
 from gensim.test.utils import common_texts, get_tmpfile, datapath
 #   file = open("/home/inje/nltk_data/text8", "r")
@@ -38,7 +41,6 @@ print("\n\n\n***************find most similar word of 'woman + king - man'******
 MostSimilar = model.wv['woman'] + model.wv['king'] - model.wv['man']
 print(MostSimilar)
 print(model.wv.similar_by_vector(MostSimilar))
-
 
 q = definition('computer')
 Result = model.wv.most_similar(positive=q.split(), topn=50)
