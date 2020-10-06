@@ -68,3 +68,4 @@ M5_rref, M5_null = FindRrefNull(M5)
 
 print("The Row echelon form of matrix M and the pivot columns : {}".format(M5_rref))
 print(M5_null)
+print(M5_null[1])
