@@ -4,10 +4,13 @@ mat = [[2, 3], [1, 7]]
 print(mat[0][0], mat[0][1])
 print(mat[1][0], mat[1][1])
 
+import torch_geometric
 import torch_sparse
-print(torch_sparse.__version__, torch.__version__, torch.cuda.get_device_capability(), torch.cuda.current_device())
+print(torch.__version__)
+print("ok")
+print(torch.cuda.get_device_capability(), torch.cuda.current_device())
 import torch_geometric as geo
-print(geo.__version__)
+#   print(geo.__version__)
 Dat_geo = geo.data.Data
 print(geo.is_debug_enabled())
 edge_index = torch.tensor([[0, 1, 1, 2], [1, 0, 2, 1]], dtype=torch.long)
