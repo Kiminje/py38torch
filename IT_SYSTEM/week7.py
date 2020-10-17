@@ -46,7 +46,7 @@ class LogisticeNeuron:
         a = 1/(1 +np.exp(-z))
         return a
 
-    def fit(self, x, y, epochs=1000):
+    def fit(self, x, y, epochs=100):
         # initialize
 
         # shape[0]은 data의 수, [1]은 column, feature 의 수를 넣어주고 싶으니 shape[1]
@@ -81,4 +81,6 @@ class LogisticeNeuron:
 neuron = LogisticeNeuron()
 neuron.fit(x_train, y_train)
 print(np.mean(neuron.predict(x_test) == y_test))
+arrtest = np.arange(100, 1500, 100)
+print(arrtest)
 # mean? 옳게 맞출 확률
