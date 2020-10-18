@@ -32,7 +32,7 @@ for ind in range(Epochs):
     y_pred = np.dot(x, w1) + w0
 
     # print("w1", w1.shape, "w0: ", w0.shape, "w1_updateshpae", w1_update.shape)
-    cost = np.sum(np.square(y - y_pred)) / N + (Alpha * np.sum(np.dot(w1.T, w1))) / N
+    cost = (np.sum(np.square(y - y_pred)) + Alpha * np.sum(np.dot(w1.T, w1))) / N
     print('Gradient Descent Total Cost:{0:.4f}'.format(cost))
     # break
 print("real coef is ", coef)
@@ -43,7 +43,8 @@ R_square = np.sum(np.square(y_pred - y_mean)) / np.sum(np.square(y - y_mean))
 print("R_square score : ", R_square)
 rmse = np.sqrt(np.sum(np.square(y- y_pred)) / N)
 print("RMSE : ", rmse)
-
+Data = np.array(coef.T, w1, w0, y_mean, )
+np.savetxt("Ridge_data", coef.T)
 
 
 
