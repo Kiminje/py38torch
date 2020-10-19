@@ -1,7 +1,7 @@
 import numpy as np
 
 np.random.seed(123)
-sample = 1000
+sample = 100
 dim = 4
 x = 2 * np.random.rand(sample,dim)
 coef = 10 * np.random.rand(1,dim)
@@ -14,7 +14,7 @@ Epochs = 1011
 N = len(y[:])
 print(N, w1.shape)
 learning_rate = 0.05 / N    # N개의 데이터에 대해 학습하기 때문에 1회 반복에 고정된 Learning Rate 사용
-Alpha = 1.0
+Alpha = 0.0
 for ind in range(Epochs):
 
 

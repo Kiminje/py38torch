@@ -1,7 +1,7 @@
 import numpy as np
 
 np.random.seed(123)
-dim = 5
+dim = 3
 x = 2 * np.random.rand(100,dim)
 coef = 10 * np.random.rand(1,dim)
 y = -8 + np.dot(x, coef.T)+np.random.randn(100,1)
@@ -13,7 +13,7 @@ Epochs = 2001
 N = len(y[:])
 print(N, w1.shape)
 learning_rate = 0.05 / N  # N개의 데이터에 대해 학습하기 때문에 1회 반복에 고정된 Learning Rate 사용
-Alpha = 1.0
+Alpha = 0.0
 for ind in range(Epochs):
 
     for i in range(N):
@@ -31,8 +31,8 @@ for ind in range(Epochs):
 
     y_pred = np.dot(x, w1) + w0
 
-    # print("w1", w1.shape, "w0: ", w0.shape, "w1_updateshpae", w1_update.shape)
-    cost = (np.sum(np.square(y - y_pred)) + Alpha * np.sum(np.dot(w1.T, w1))) / N
+    print("w1", w1.shape, "w0: ", w0.shape, "w1_updateshpae", w1_update.shape)
+    cost = np.sum(np.square(y - y_pred)) / N + (Alpha * np.sum(np.dot(w1.T, w1))) / N
     print('Gradient Descent Total Cost:{0:.4f}'.format(cost))
     # break
 print("real coef is ", coef)
@@ -43,8 +43,6 @@ R_square = np.sum(np.square(y_pred - y_mean)) / np.sum(np.square(y - y_mean))
 print("R_square score : ", R_square)
 rmse = np.sqrt(np.sum(np.square(y- y_pred)) / N)
 print("RMSE : ", rmse)
-Data = np.array(coef.T, w1, w0, y_mean, )
-np.savetxt("Ridge_data", coef.T)
 
 
 

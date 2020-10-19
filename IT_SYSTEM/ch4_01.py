@@ -16,9 +16,6 @@ y = cancer.target
  -> it means the # of cancer data is 569 and each data has 30 parameters
  """
 x_train, x_test, y_train, y_test = train_test_split(x, y, stratify=y, test_size=0.2, random_state=42)
-LR = 0.01
-EPOCH = 10000
-DYNAMIC = 0.95
 
 class LogisticNeuron:
 
@@ -43,16 +40,12 @@ class LogisticNeuron:
         a = 1 / (1 + np.exp(-z))  # 시그모이드 계산
         return a
 
-    def activate_ReLU(self, z):
-        a = np.maximum(z, 0)
-        return a
-
-    def fit(self, x, y, epochs):
+    def fit(self, x, y, epochs, learningrate):
         start = time.time()
         self.w = np.ones(x.shape[1])  # 가중치를 초기화합니다.
         self.b = 0  # 절편을 초기화합니다.
         # self.epsilon = 0.1*np.sum(x.shape[1])/np.sum(x.shape)
-        self.epsilon = LR / np.sum(x.shape[0])  # data 수만큼 scaling한다.
+        self.epsilon = learningrate / np.sum(x.shape[0])  # data 수만큼 scaling한다.
         # print("this is the code for checking epsilon",np.sum(x.shape), np.sum(x.shape[1]))
         # 'epsilon' means learning rate and its value is (sum of parameters)
         # Learning rate is hyper parameter
@@ -74,80 +67,10 @@ class LogisticNeuron:
             self.w -= self.epsilon * w_grad  # 가중치 업데이트
             self.b -= self.epsilon * b_grad  # 절편 업데이트
         return time.time() - start
-
-
-    def fit_dynamic(self, x, y, epochs):
-        start = time.time()
-        self.w = np.ones(x.shape[1])  # 가중치를 초기화합니다.
-        self.b = 0  # 절편을 초기화합니다.
-        # self.epsilon = 0.1*np.sum(x.shape[1])/np.sum(x.shape)
-        self.epsilon = LR / np.sum(x.shape[0])  # data 수만큼 scaling한다.
-        # print("this is the code for checking epsilon",np.sum(x.shape), np.sum(x.shape[1]))
-        # 'epsilon' means learning rate and its value is (sum of parameters)
-        # Learning rate is hyper parameter
-
-        for i in range(epochs):  # epochs만큼 반복합니다
-            w_grad = np.zeros(x.shape[1])
-            # print(np.shape(w_grad))
-            b_grad = 0.0
-
-            for x_i, y_i in zip(x, y):  # 모든 샘플에 대해 반복합니다
-                z = self.forpass(x_i)  # 정방향 계산
-                a = self.activation(z)  # 활성화 함수 적용
-                err = -(y_i - a)  # 오차 계산
-                # print(err)
-                w_grad_i, b_grad_i = self.backprop(x_i, err)  # 역방향 계산 derr/dx
-                w_grad += w_grad_i
-                b_grad += b_grad_i
-
-            self.w -= self.epsilon * w_grad  # 가중치 업데이트
-            self.b -= self.epsilon * b_grad  # 절편 업데이트
-            self.epsilon *= DYNAMIC
-        return time.time() - start
-
-
-    def fit_LR(self, x, y, epochs):
-        start = time.time()
-        self.w = np.ones(x.shape[1])  # 가중치를 초기화합니다.
-        self.b = 0  # 절편을 초기화합니다.
-        # self.epsilon = 0.1*np.sum(x.shape[1])/np.sum(x.shape)
-        rate = []
-
-        self.epsilon = LR / np.sum(x.shape[0])  # data 수만큼 scaling한다.
-        # print("this is the code for checking epsilon",np.sum(x.shape), np.sum(x.shape[1]))
-        # 'epsilon' means learning rate and its value is (sum of parameters)
-        # Learning rate is hyper parameter
-
-        for i in range(epochs):  # epochs만큼 반복합니다
-            w_grad = np.zeros(x.shape[1])
-            # print(np.shape(w_grad))
-            b_grad = 0.0
-
-            for x_i, y_i in zip(x, y):  # 모든 샘플에 대해 반복합니다
-                z = self.forpass(x_i)  # 정방향 계산
-                a = self.activation(z)  # 활성화 함수 적용
-                err = -(y_i - a)  # 오차 계산
-                # print(err)
-                w_grad_i, b_grad_i = self.backprop(x_i, err)  # 역방향 계산 derr/dx
-                w_grad += w_grad_i
-                b_grad += b_grad_i
-
-            self.w -= self.epsilon * w_grad  # 가중치 업데이트
-            self.b -= self.epsilon * b_grad  # 절편 업데이트
-            self.epsilon *= DYNAMIC
-        end = time.time() - start
-
-
-        return
 
     def predict(self, x):
         z = [self.forpass(x_i) for x_i in x]  # 정방향 계산
         a = self.activation(np.array(z))  # 활성화 함수 적용
-        return a > 0.5
-
-    def predict_ReLU(self, x):
-        z = [self.forpass(x_i) for x_i in x]  # 정방향 계산
-        a = self.activate_ReLU(np.array(z))  # 활성화 함수 적용
         return a > 0.5
 
 
@@ -155,25 +78,44 @@ class LogisticNeuron:
 
 
 @jit()
-def collect_data():
+def collect_data(outfile):
     neuron = LogisticNeuron()
-    EpochArr = [1800]
-    AccArr = []
-    TimeArr = []
+    EpochArr = [100, 500, 1000, 3000]
+    TestRate = [0.7, 0.5, 0.3, 0.2, 0.1]
+    LearnRate = [0.005, 0.01, 0.05, 0.2, 0.5]
+    Index = [EpochArr, TestRate, LearnRate]
+    np.array(Index)
+    Result = []
     for i in EpochArr:
-        print("{} time!".format(i))
-        TimeArr.append(neuron.fit(x_train, y_train, i))
-        AccArr.append(np.mean(neuron.predict(x_test) == y_test))
-        print(np.mean(neuron.predict(x_test) == y_test))
-        neuron.fit_dynamic(x_train, y_train, i)
-        print(np.mean(neuron.predict(x_test) == y_test))
-    return AccArr, TimeArr
+        perEpoch = []
+        for rate in TestRate:
+            perRate = []
+            x_train, x_test, y_train, y_test = train_test_split(x, y, stratify=y, test_size=rate, random_state=42)
+            for lr in LearnRate:
+                perlr = []
+                perlr.append(lr)
+
+                print("{} time!, {}test rate! {} learningrate".format(i, rate, lr))
+
+                TempTime = neuron.fit(x_train, y_train, i, lr)
+                perlr.append(TempTime)
+                TempAcc = np.mean(neuron.predict(x_test) == y_test)
+                perlr.append(TempAcc)
+                print(TempAcc)
+                perRate.append(perlr)
+
+            np.savetxt(outfile, perRate, header="{} epoch   {} data rate, Check the Learning rate column 0".format(i, rate))
+            perEpoch.append(perRate)
+        Result.append(perEpoch)
+        print(Result)
+    return Result, Index
 
 
 # EpochArr = [i * 100 for i in range(1, 101)]
-AccArr, TimeArr = collect_data()
+with open('test.txt', 'w') as outfile:
+    Result, Ind = collect_data(outfile)
 
-EpArr = np.arange(1400, 2000, 100)
+
 
 #collect_data()
 # plt.plot(EpArr, TimeArr)
