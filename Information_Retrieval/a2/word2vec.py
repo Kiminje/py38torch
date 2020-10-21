@@ -18,7 +18,8 @@ def sigmoid(x):
     """
 
     ### YOUR CODE HERE (~1 Line)
-    s = 1/ (np.exp(-x)+1)
+    #numpy에 구현된 exponential 함수를 쓰면 간단하게 나타낼 수 있다.
+    s = 1./(np.exp(-x)+1.)
 
     ### END YOUR CODE
 
@@ -59,8 +60,22 @@ def naiveSoftmaxLossAndGradient(
     """
 
     ### YOUR CODE HERE (~6-8 Lines)
-    loss = -np.log(softmax(np.dot(outsideVectors * centerWordVec)))
-    gradCenterVec = np.dot(outsideVectors, centerWordVec
+    #y_hat.shape = ( # of words in vocab, )
+    y_hat = softmax(np.dot(outsideVectors, centerWordVec))
+    #loss 값 계산
+    loss = -np.log(y_hat)
+    # 문제지 (b)에서 U(y_hat - y)를 구현했었다..
+    # 또한 (c)에서 y_hat - y꼴이 등장하므로 계산해놓는다.
+    # subtraction = y_hat - y 이다. u_o에만 1(y)값을 뺴줘야 제대로 계산이 된다. (w = 0 인 case)
+    # 그 이외에는  y_hat 이기 때문에 indexing으로 해당 element만 -y(-1)을 취한다.
+    subtraction = y_hat
+    subtraction[outsideWordIdx] -= 1
+    #  aJ / av_c는 (U.T(y_hat -y))
+    gradCenterVec = outsideVectors.T.dot(subtraction)
+    #   aJ / aU의 계산, 실제로 (c)문제를 이용하면, matrix의 형태는 diagonal 값은 (y_hat -y)v_c.T 을 사용,
+    #   그 외의 값은 y_hat v_c.T 를 사용한다.
+    #   matrix의 형태는 (# of words in vocab, word vec length) 이다. np.dot을 잘 이용해 계산한다.
+    gradOutsideVecs = subtraction[:, np.newaxis].dot(np.array([centerWordVec]))
 
     ### Please use the provided softmax function (imported earlier in this file)
     ### This numerically stable implementation helps you avoid issues pertaining
@@ -158,6 +173,22 @@ def skipgram(currentCenterWord, windowSize, outsideWords, word2Ind,
     gradOutsideVectors = np.zeros(outsideVectors.shape)
 
     ### YOUR CODE HERE (~8 Lines)
+    #   word2Ind dictionary로부터 현재 Vc의 index값을 얻는다
+    centerWordIdx = word2Ind[currentCenterWord]
+    # index 값을 이용해 word vector집합에서 현재 centerword를 얻는다.
+    centerWordVec = centerWordVectors[centerWordIdx]
+    # outsideWords에서 outside word(string)추출, word2Ind를 이용해 해당 word에 대한 index저장
+    outsideWordIndices = [word2Ind[i] for i in outsideWords]
+
+    # J_skipgram 의 v_c, U 에 대한 편미분을 구하고, loss를 구한다.
+    # 반복문은 -m <= j <= m, j != 0 이므로 2m번 반복한다.
+    for outsideWordIdx in outsideWordIndices:
+        one_loss, one_gradCenter, one_gradOutside = \
+            word2vecLossAndGradient(centerWordVec, outsideWordIdx, outsideVectors, dataset)
+
+        loss += one_loss
+        gradCenterVecs[centerWordIdx] += one_gradCenter
+        gradOutsideVectors += one_gradOutside
 
     ### END YOUR CODE
     

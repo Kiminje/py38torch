@@ -61,6 +61,8 @@ def sgd(f, x0, step, iterations, postprocessing=False, useSaved=False,
     """
 
     # Anneal learning rate every several iterations
+    # -> parameter들이 이미 저장되어있다면, 매 iteration마다 annealing한다.
+    # 예를 들면 20000번 반복시에는 step size가 절반이 된다.
     ANNEAL_EVERY = 20000
 
     if useSaved:
@@ -86,20 +88,29 @@ def sgd(f, x0, step, iterations, postprocessing=False, useSaved=False,
 
         loss = None
         ### YOUR CODE HERE (~2 lines)
-
+        # run.py 의 sgd 를 참조하여 f(x)를 찾는다.
+        # f = word2vec_sgd_wrapper(skipgram, tokens, vec, dataset, C,naiveSoftmaxLossAndGradient) 이다.
+        # f는 batch size = 50으로 하여 skip gram 에 대해 naiveSoftmaxLossAndGradient를 수행한다.
+        # grad는 각 인자에 대한 편미분 행렬을 더한 gradient matrix.
+        loss, grad = f(x)
+        #step size만큼 parameter들을 update한다.
+        x -= step * grad
         ### END YOUR CODE
 
+        #cost가 갑자기 커지는 것을 방지하기위해?
         x = postprocessing(x)
         if iter % PRINT_EVERY == 0:
-            if not exploss:
+
+            if not np.any(exploss):
+
                 exploss = loss
             else:
                 exploss = .95 * exploss + .05 * loss
             print("iter %d: %f" % (iter, exploss))
-
+        # 5000번 iteration 마다 parameter저장
         if iter % SAVE_PARAMS_EVERY == 0 and useSaved:
             save_params(iter, x)
-
+        # 20000번 학습마 step size를 절반으로 줄인다.
         if iter % ANNEAL_EVERY == 0:
             step *= 0.5
 
