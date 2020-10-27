@@ -21,5 +21,7 @@ m2 = np.ones(m1.shape)
 M = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 print(M[0:2].T)
 # print(np.dot(M[0:2] , M[0]))
-print("start\n",np.multiply(M, M[2]))
+print(np.square(M[0]))
+
+print("start\n",np.multiply(M[0], M[2, np.newaxis]))
 # print(M[:, :, np.newaxis].dot(M[:, np.newaxis, :]))

@@ -51,7 +51,7 @@ class LogisticNeuron:
 
     def activation(self, z_k):
         z_k = np.clip(z_k, -100, None)  # 안전한 np.exp() 계산을 위해
-        a_k = 1.0 / (1.0 + np.exp(-z_k))  # 시그모이드 계산
+        a_k = np.clip(1.0 / (1.0 + np.exp(-z_k)), 1.0e-10, 1.0-1.0e-10 ) # 시그모이드 계산
         return a_k
 
     def fit(self, x, y, epochs=Epochs, Shuffle=True):
@@ -74,7 +74,7 @@ class LogisticNeuron:
             z = self.forpass(x)  # 정방향 계산
             a = self.activation(z)  # sigmoid
             sub = y - a  # y - y_hat
-            loss = np.sum(-np.multiply(y, np.log(a))) / self.Datalen  # cross entropy
+            loss = np.sum(-np.multiply(y, np.log(a))-np.multiply((1-y), np.log((1-a)))) / self.Datalen  # cross entropy
             # print(self.w, self.b)
             w_grad, b_grad = self.backprop(x, y, a)
 
@@ -120,7 +120,7 @@ class LogisticNeuron:
             z = self.forpass(x_s)  # 정방향 계산
             a = self.activation(z)  # sigmoid
             sub = y_s - a  # y - y_hat
-            loss = np.sum(-np.multiply(y_s, np.log(a))) / self.Datalen  # cross entropy
+            loss = np.sum(-np.multiply(y, np.log(a))-np.multiply((1-y), np.log((1-a)))) / self.Datalen  # cross entropy
             # print(self.w, self.b)
             w_grad, b_grad = self.backprop(x_s, y_s, a)
 
