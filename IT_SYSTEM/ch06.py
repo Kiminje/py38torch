@@ -201,3 +201,9 @@ plt.ylabel('loss')
 plt.xlabel('epoch')
 plt.legend(['train_loss', 'val_loss'])
 plt.savefig('dual.png')
+
+"""
+weight_init_random or not
+dual or single
+
+"""
