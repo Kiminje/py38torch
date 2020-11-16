@@ -64,8 +64,11 @@ class MultiClassNetwork:
         for i in range(epochs):
             loss = 0
             print('.', end='')
+            iter = 0
             # 제너레이터 함수에서 반환한 미니배치를 순환합니다.
             for x_batch, y_batch in self.gen_batch(x, y):
+                print(iter, end='')
+                iter+=1
                 a = self.training(x_batch, y_batch)
                 # 안전한 로그 계산을 위해 클리핑합니다.
                 a = np.clip(a, 1e-10, 1-1e-10)
@@ -85,6 +88,8 @@ class MultiClassNetwork:
         x = x[indexes]
         y = y[indexes]
         for i in range(bins):
+            # print(iter, end='')
+            # iter+=1
             start = self.batch_size * i
             end = self.batch_size * (i + 1)
             yield x[start:end], y[start:end]   # batch_size만큼 슬라이싱하여 반환합니다.
@@ -140,9 +145,19 @@ x_val = x_val.reshape(-1, 784)
 y_train_encoded = tf.keras.utils.to_categorical(y_train)
 y_val_encoded = tf.keras.utils.to_categorical(y_val)
 
+"""
+sgd = SGD
+rmsprop = RMSprop
+adagrad = Adagrad
+adadelta = Adadelta
+adam = Adam
+adamax = Adamax
+nadam = Nadam
+"""
+
 #   variable : regularization L1 & L2
-Lasso = [0, 0.1, 0.01, 0.001, 0.0001]
-Ridge = [0, 0.1, 0.01, 0.001, 0.0001]
+Lasso = [1e-6]
+Ridge = [1e-6]
 # for i in Lasso:
 #     for j in Ridge:
 #         fc = MultiClassNetwork(units=100, batch_size=256, l1=i, l2=j)
@@ -160,32 +175,46 @@ Ridge = [0, 0.1, 0.01, 0.001, 0.0001]
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras import regularizers
-Opt = ['sgd', 'RMSprop', 'Adam', 'Adagrad']
+from time import time
+Batchs = [512, 1024, 2048, 4096]
+Opt = ['sgd', 'rmsprop', 'adam', 'adagrad']
+Time = []
 for k in Opt:
-    for i in Lasso:
-        for j in Ridge:
-            model = Sequential()
-            model.add(Dense(100, activation='sigmoid', input_shape=(784,), kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
-            model.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
+    for Batch in Batchs:
+        for i in Lasso:
+            for j in Ridge:
+                start = time()
+                print("start Opt= {}, BatchSize= {}".format(k, Batch))
+                model = Sequential()
+                model.add(Dense(100, activation='sigmoid', input_shape=(784,),
+                                kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
+                model.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
 
-            model.compile(optimizer=k, loss='categorical_crossentropy', metrics=['accuracy'])
-            history = model.fit(x_train, y_train_encoded, epochs=80, validation_data=(x_val, y_val_encoded))
+                model.compile(optimizer=k, loss='categorical_crossentropy', metrics=['accuracy'])
+                history = model.fit(x_train, y_train_encoded, epochs=40, validation_data=(x_val, y_val_encoded), batch_size=Batch)
+                Time.append(time() - start)
 
+                plt.plot(history.history['loss'])
+                plt.plot(history.history['val_loss'])
+                plt.ylabel('loss')
+                plt.xlabel('epoch')
+                plt.legend(['train_loss', 'val_loss'])
+                plt.grid(b=True, which='major', color='#666666', linestyle='-')
+                plt.minorticks_on()
+                plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                plt.savefig('ch07_{}_loss_batch{}.png'.format(k, Batch))
+                plt.clf()
 
-            plt.plot(history.history['loss'])
-            plt.plot(history.history['val_loss'])
-            plt.ylabel('loss')
-            plt.xlabel('epoch')
-            plt.legend(['train_loss', 'val_loss'])
-            plt.savefig('ch07_{}_loss_l1_{}_l2_{}.png'.format(k, i, j))
-            plt.clf()
+                plt.plot(history.history['accuracy'])
+                plt.plot(history.history['val_accuracy'])
+                plt.ylabel('accuracy')
+                plt.xlabel('epoch')
+                plt.legend(['train_accuracy', 'val_accuracy'])
+                plt.grid(b=True, which='major', color='#666666', linestyle='-')
+                plt.minorticks_on()
+                plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                plt.savefig('ch07_{}_epoch_batch{}.png'.format(k, Batch))
+                plt.clf()
 
-            plt.plot(history.history['accuracy'])
-            plt.plot(history.history['val_accuracy'])
-            plt.ylabel('accuracy')
-            plt.xlabel('epoch')
-            plt.legend(['train_accuracy', 'val_accuracy'])
-            plt.savefig('ch07_{}_epoch_l1_{}_l2_{}.png'.format(k, i, j))
-
-            loss, accuracy = model.evaluate(x_val, y_val_encoded, verbose=0)
-            print(accuracy)
+                loss, accuracy = model.evaluate(x_val, y_val_encoded, verbose=0)
+                print(accuracy)
