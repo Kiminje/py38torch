@@ -6,7 +6,7 @@ from sklearn.preprocessing import LabelBinarizer
 
 class MultiClassNetwork:
     
-    def __init__(self, units=10, batch_size=32, learning_rate=0.1, l1=0, l2=0):
+    def __init__(self, units=10, batch_size=512, learning_rate=0.1, l1=0, l2=0):
         self.units = units         # 은닉층의 뉴런 개수
         self.batch_size = batch_size     # 배치 크기
         self.w1 = None             # 은닉층의 가중치
@@ -169,7 +169,7 @@ for k in Opt:
             model.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
 
             model.compile(optimizer=k, loss='categorical_crossentropy', metrics=['accuracy'])
-            history = model.fit(x_train, y_train_encoded, epochs=80, validation_data=(x_val, y_val_encoded))
+            history = model.fit(x_train, y_train_encoded, epochs=40, validation_data=(x_val, y_val_encoded))
 
 
             plt.plot(history.history['loss'])
@@ -186,6 +186,35 @@ for k in Opt:
             plt.xlabel('epoch')
             plt.legend(['train_accuracy', 'val_accuracy'])
             plt.savefig('ch07_{}_epoch_l1_{}_l2_{}.png'.format(k, i, j))
-
+            plt.clf()
             loss, accuracy = model.evaluate(x_val, y_val_encoded, verbose=0)
             print(accuracy)
+
+Acts = ['relu', 'sigmoid']
+for act in Acts:
+    model = Sequential()
+    model.add(Dense(392, activation=act, input_shape=(784,), kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
+    model.add(Dense(194, activation=act, kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
+    model.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
+
+    model.compile(optimizer=k, loss='categorical_crossentropy', metrics=['accuracy'])
+    history = model.fit(x_train, y_train_encoded, epochs=80, validation_data=(x_val, y_val_encoded))
+
+
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train_loss', 'val_loss'])
+    plt.savefig('ch07_{}_loss.png'.format(act))
+    plt.clf()
+
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train_accuracy', 'val_accuracy'])
+    plt.savefig('ch07_{}_epoch.png'.format(act))
+    plt.clf()
+    loss, accuracy = model.evaluate(x_val, y_val_encoded, verbose=0)
+    print(accuracy)
