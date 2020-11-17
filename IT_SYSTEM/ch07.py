@@ -176,7 +176,8 @@ from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras import regularizers
 from time import time
-Batchs = [512, 1024, 2048, 4096]
+Epochs =[40, 160, 640]
+Batchs = [128, 256, 512]
 Opt = ['sgd', 'rmsprop', 'adam', 'adagrad']
 Time = []
 for k in Opt:
@@ -194,6 +195,7 @@ for k in Opt:
                 history = model.fit(x_train, y_train_encoded, epochs=40, validation_data=(x_val, y_val_encoded), batch_size=Batch)
                 Time.append(time() - start)
 
+
                 plt.plot(history.history['loss'])
                 plt.plot(history.history['val_loss'])
                 plt.ylabel('loss')
@@ -202,6 +204,7 @@ for k in Opt:
                 plt.grid(b=True, which='major', color='#666666', linestyle='-')
                 plt.minorticks_on()
                 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                plt.title("<LOSS> Epoch: {}, BatchSize: {}".format(k, Batch))
                 plt.savefig('ch07_{}_loss_batch{}.png'.format(k, Batch))
                 plt.clf()
 
@@ -213,6 +216,7 @@ for k in Opt:
                 plt.grid(b=True, which='major', color='#666666', linestyle='-')
                 plt.minorticks_on()
                 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+                plt.title("<ACC> Epoch: {}, BatchSize: {}".format(k, Batch))
                 plt.savefig('ch07_{}_epoch_batch{}.png'.format(k, Batch))
                 plt.clf()
 
