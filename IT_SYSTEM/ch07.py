@@ -178,7 +178,7 @@ from tensorflow.keras import regularizers
 from time import time
 Epochs =[40, 160, 640]
 Batchs = [64]
-Opt = ['sgd', 'rmsprop', 'adam', 'adagrad']
+Opt = ['sgd', 'adagrad']
 Time = []
 for k in Opt:
     for Batch in Batchs:
@@ -192,7 +192,7 @@ for k in Opt:
                 model.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
 
                 model.compile(optimizer=k, loss='categorical_crossentropy', metrics=['accuracy'])
-                history = model.fit(x_train, y_train_encoded, epochs=120, validation_data=(x_val, y_val_encoded), batch_size=Batch)
+                history = model.fit(x_train, y_train_encoded, epochs=300, validation_data=(x_val, y_val_encoded), batch_size=Batch)
                 Time.append(time() - start)
 
 
@@ -205,7 +205,7 @@ for k in Opt:
                 plt.minorticks_on()
                 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
                 plt.title("<LOSS> Optimizer: {}, BatchSize: {}".format(k, Batch))
-                plt.savefig('ch07_{}_loss_batch{}.png'.format(k, Batch))
+                plt.savefig('ch07_300_loss_{}_batch{}.png'.format(k, Batch))
                 plt.clf()
 
                 plt.plot(history.history['accuracy'])
@@ -217,7 +217,7 @@ for k in Opt:
                 plt.minorticks_on()
                 plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
                 plt.title("<ACC> Optimizer: {}, BatchSize: {}".format(k, Batch))
-                plt.savefig('ch07_{}_epoch_batch{}.png'.format(k, Batch))
+                plt.savefig('ch07_300_epoch_{}_batch{}.png'.format(k, Batch))
                 plt.clf()
 
                 loss, accuracy = model.evaluate(x_val, y_val_encoded, verbose=0)
