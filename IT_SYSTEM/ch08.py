@@ -10,6 +10,18 @@ from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.layers import Dropout
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Currently, memory growth needs to be the same across GPUs
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        print(e)
+
 
 def relu(x):
     return np.maximum(x,0)
@@ -123,19 +135,19 @@ y_train_encoded = tf.keras.utils.to_categorical(y_train)
 y_val_encoded = tf.keras.utils.to_categorical(y_val)
 x_train = x_train.reshape(-1, 28, 28, 1)
 x_val = x_val.reshape(-1, 28, 28, 1)
+#
+# cn = ConvolutionNetwork(n_kernels=10, units=100, batch_size=128, learning_rate=0.01)
+# cn.fit(x_train, y_train_encoded, x_val=x_val, y_val=y_val_encoded, epochs=20)
+#
+# plt.plot(cn.losses)
+# plt.plot(cn.val_losses)
+# plt.ylabel('loss')
+# plt.xlabel('iteration')
+# plt.legend(['train_loss', 'val_loss'])
+# plt.savefig('ch08_01.png')
+# plt.clf()
 
-cn = ConvolutionNetwork(n_kernels=10, units=100, batch_size=128, learning_rate=0.01)
-cn.fit(x_train, y_train_encoded, x_val=x_val, y_val=y_val_encoded, epochs=20)
-
-plt.plot(cn.losses)
-plt.plot(cn.val_losses)
-plt.ylabel('loss')
-plt.xlabel('iteration')
-plt.legend(['train_loss', 'val_loss'])
-plt.savefig('ch08_01.png')
-plt.clf()
-
-print(cn.score(x_val, y_val_encoded))
+# print(cn.score(x_val, y_val_encoded))
 
 conv1 = tf.keras.Sequential()
 conv1.add(Conv2D(10, (3, 3), activation='relu', padding='same', input_shape=(28, 28, 1)))
