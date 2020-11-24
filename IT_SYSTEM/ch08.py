@@ -9,7 +9,7 @@ from scipy.signal import correlate2d
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.layers import Dropout
-
+from tensorflow.keras import regularizers
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
@@ -189,8 +189,10 @@ x_val /= 255
 # loss, accuracy = conv1.evaluate(x_val, y_val_encoded, verbose=0)
 # print(accuracy)
 ChNums = [64]
-layers = [20]
-Ratios = [0.3]
+layers = [10]
+Ratios = [0.25]
+i = 1e-5
+j = 1e-5
 for Ch in ChNums:
     for Layer in layers:
         Split = Layer // 2
@@ -208,22 +210,17 @@ for Ch in ChNums:
             conv2.add(Dense(1024, activation='relu'))
             conv2.add(Dropout(ratio))
             conv2.add(Dense(512, activation='relu'))
-            conv2.add(Dense(10, activation='softmax'))
+            conv2.add(Dropout(ratio))
+            conv2.add(Dense(64, activation='relu'))
+            conv2.add(Dropout(ratio))
+            conv2.add(Dense(10, activation='softmax', kernel_regularizer=regularizers.l1_l2(l1=i, l2=j)))
 
             conv2.summary()
-            Path = './BestAccCh08'
-            model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-                filepath=Path,
-                save_weights_only=True,
-                monitor='val_acc',
-                mode='max',
-                save_best_only=True)
 
             conv2.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-            history = conv2.fit(x_train, y_train_encoded, batch_size=32, epochs=15, validation_data=(x_val, y_val_encoded), callbacks=[model_checkpoint_callback])
+            history = conv2.fit(x_train, y_train_encoded, batch_size=32, epochs=30, validation_data=(x_val, y_val_encoded))
             print("training end!")
-            conv2.load_weights(Path)
-            loss, accuracy = conv2.evaluate(x_test, y_test, verbose=0)
+            loss, accuracy = conv2.evaluate(x_val, y_val_encoded, verbose=0)
             print(accuracy)
 
             plt.plot(history.history['loss'])
