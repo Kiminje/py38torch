@@ -119,6 +119,7 @@ from sklearn.model_selection import train_test_split
 
 X_train= pd.DataFrame(X_train, columns=mnist.feature_names)
 y_train=pd.DataFrame(y_train)
+y_train = y_train.values.ravel()
 # rf_w = RandomForestClassifier(random_state=42, class_weight = 'balanced')
 # rf_w.fit(X_train, y_train.values.ravel())
 #
@@ -285,73 +286,91 @@ Adaboosting
 random forest
 train 4 of models using gride search and apply on soft & hard voting
 """
-k_fold = StratifiedKFold(shuffle=True, random_state=42)
-RF_best = RandomForestClassifier()
-RF_param = {"max_depth": [4, 8, 10],
-            'max_features': ['auto', 'log2'],
-            'n_estimators': [100, 200, 500],
-            'criterion':['gini', 'entropy']}
-gsRF = GridSearchCV(RF_best, RF_param, cv=k_fold, scoring='accuracy')
-gsRF.fit(X_train, y_train)
-RF_best = gsRF.best_estimator_
-print(gsRF.__class__, gsRF.best_params_, gsRF.best_score_)
-RF_pred = RF_best.predict(X_test)
-accuracy = accuracy_score(y_test, RF_pred)
-print("RF 정확도: {0:.4f}".format(accuracy))
+with open("mnist_result.csv", "w", encoding="UTF-8") as f:
+    f.write("Classifier,Accuracy,parameter list")
+    k_fold = StratifiedKFold(n_splits=3 ,shuffle=True, random_state=42)
+    RF_best = RandomForestClassifier()
+    RF_param = {"max_depth": [10],
+                'max_features': ['auto'],
+                'n_estimators': [500],
+                'criterion':['entropy'],
+                'random_state': [42]}
+    gsRF = GridSearchCV(RF_best, RF_param, cv=k_fold, scoring='accuracy', verbose=1,n_jobs=4)
+    gsRF.fit(X_train, y_train)
+    RF_best = gsRF.best_estimator_
+    print(gsRF.__class__, gsRF.best_params_, gsRF.best_score_)
+    RF_pred = RF_best.predict(X_test)
+    accuracy = accuracy_score(y_test, RF_pred)
+    """
+    <class 'sklearn.model_selection._search.GridSearchCV'> {'criterion': 'entropy', 'max_depth': 10, 'max_features': 'auto', 'n_estimators': 500, 'random_state': 42} 0.9489333333333333
+    RF 정확도: 0.9527
+"""
+    print("RF 정확도: {0:.4f}".format(accuracy))
+    f.write("{}".format(gsRF.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsRF.best_params_) + '\n')
+
+    Ada_best = AdaBoostClassifier()
+    Ada_param = {'n_estimators': [500],
+                 'base_estimator': [DecisionTreeClassifier(max_depth=2)],
+                 'learning_rate': [0.1, 0.05],
+                'algorithm': ['SAMME.R'],
+                 'random_state': [42]}
+    gsAda = GridSearchCV(Ada_best, Ada_param, cv=k_fold, scoring='accuracy', verbose=1,n_jobs=4)
+    gsAda.fit(X_train, y_train)
+    Ada_best = gsAda.best_estimator_
+    print(gsAda.classes_, gsAda.best_params_, gsAda.best_score_)
+    Ada_pred = Ada_best.predict(X_test)
+    accuracy = accuracy_score(y_test, Ada_pred)
+    print("Ada 정확도: {0:.4f}".format(accuracy))
+    f.write("{}".format(gsAda.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsAda.best_params_) + '\n')
+
+    GBM_best = GradientBoostingClassifier()
+    GBM_param = {"max_depth": [4],
+                'max_features': ['auto'],
+                'n_estimators': [200, 500],
+                 'learning_rate': [0.1],
+                 'random_state': [42]}
+    gsGBM = GridSearchCV(GBM_best, GBM_param, cv=k_fold, scoring='accuracy', verbose=1, n_jobs=4)
+    gsGBM.fit(X_train, y_train)
+    GBM_best = gsGBM.best_estimator_
+    print(gsGBM.classes_, gsGBM.best_params_, gsGBM.best_score_)
+    GBM_pred = GBM_best.predict(X_test)
+    accuracy = accuracy_score(y_test, GBM_pred)
+    print("GBM 정확도: {0:.4f}".format(accuracy))
+    sent = "{}".format(gsGBM.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsGBM.best_params_) + '\n'
+    f.write(sent)
 
 
-Ada_best = AdaBoostClassifier()
-Ada_param = {"max_depth": [1, 2],
-            'n_estimators': [100, 200, 500],
-            'algorithm': ['SAMME.R'],
-            'random_state':[42]}
-gsAda = GridSearchCV(Ada_best, Ada_param, cv=k_fold, scoring='accuracy')
-gsAda.fit(X_train, y_train)
-Ada_best = gsAda.best_estimator_
-print(gsAda.classes_, gsAda.best_params_, gsAda.best_score_)
-Ada_pred = Ada_best.predict(X_test)
-accuracy = accuracy_score(y_test, Ada_pred)
-print("Ada 정확도: {0:.4f}".format(accuracy))
+    XGB_best = xgboost.XGBClassifier()
+    XG_param = {"max_depth": [8],
+                'min_child_weight': [3,6],
+                'gamma': [0, 1e-1],
+                 'learning_rate': [0.5],
+                'random_state': [42]}
+    gsXG = GridSearchCV(XGB_best, XG_param, cv=k_fold, scoring='accuracy', verbose=1,n_jobs=4)
+    gsXG.fit(X_train, y_train)
+    XG_best = gsXG.best_estimator_
+    print(gsXG.classes_, gsXG.best_params_, gsXG.best_score_)
+    XG_pred = XG_best.predict(X_test)
+    accuracy = accuracy_score(y_test, XG_pred)
+    print("XGB 정확도: {0:.4f}".format(accuracy))
+    f.write("{}".format(gsXG.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsXG.best_params_) + '\n')
 
 
-GBM_best = GradientBoostingClassifier()
-GBM_param = {"max_depth": [4, 8],
-            'max_features': ['auto', 'log2'],
-            'n_estimators': [100, 200, 500],
-            'criterion':['gini', 'entropy'],
-             'learning_rate': [0.1, 0.5, 0.02]}
-gsGBM = GridSearchCV(GBM_best, GBM_param, cv=k_fold, scoring='accuracy')
-gsGBM.fit(X_train, y_train)
-GBM_best = gsGBM.best_estimator_
-print(gsGBM.classes_, gsGBM.best_params_, gsGBM.best_score_)
-GBM_pred = GBM_best.predict(X_test)
-accuracy = accuracy_score(y_test, GBM_pred)
-print("GBM 정확도: {0:.4f}".format(accuracy))
-XGB_best = xgboost.XGBClassifier()
-XG_param = {"max_depth": [4, 8],
-            'min_child_weight': [3,6],
-            'gamma': [0, 1e-3, 1e-2, 1e-1],
-             'learning_rate': [0.1, 0.5, 0.02]}
-gsXG = GridSearchCV(XGB_best, XG_param, cv=k_fold, scoring='accuracy')
-gsXG.fit(X_train, y_train)
-XG_best = gsXG.best_estimator_
-print(gsXG.classes_, gsXG.best_params_, gsXG.best_score_)
-XG_pred = XG_best.predict(X_test)
-accuracy = accuracy_score(y_test, XG_pred)
-print("XGB 정확도: {0:.4f}".format(accuracy))
-# ada_clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1),n_estimators=200, algorithm='SAMME.R',learning_rate=0.5, random_state=42)
-voting_clf = VotingClassifier(
-    estimators=[('rfc', RF_best), ('xgb', XG_best), ('gbc', GBM_best), ('ada', Ada_best)],
-    voting='hard', n_jobs=-1)
-voting_clf.fit(X_train, y_train)
-voting_pred=voting_clf.predict(X_test)
-accuracy  = accuracy_score(y_test, voting_pred)
-print("hard voting 정확도: {0:.4f}".format(accuracy))
+    # ada_clf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=1),n_estimators=200, algorithm='SAMME.R',learning_rate=0.5, random_state=42)
+    voting_clf = VotingClassifier(
+        estimators=[('rfc', RF_best), ('xgb', XG_best), ('gbc', GBM_best), ('ada', Ada_best)],
+        voting='hard', verbose=1, n_jobs=4)
+    voting_clf.fit(X_train, y_train)
+    voting_pred=voting_clf.predict(X_test)
+    accuracy  = accuracy_score(y_test, voting_pred)
+    print("hard voting 정확도: {0:.4f}".format(accuracy))
+    f.write("hard voting"+ ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(voting_clf.best_params_) + '\n')
 
-voting_clf1 = VotingClassifier(
-    estimators=[('rfc', RF_best), ('xgb', XG_best), ('gbc', GBM_best), ('ada', Ada_best)],
-    voting='soft', n_jobs=-1)
-voting_clf1.fit(X_train, y_train)
-voting_pred=voting_clf1.predict(X_test)
-accuracy  = accuracy_score(y_test, voting_pred)
-print("soft voting 정확도: {0:.4f}".format(accuracy))
+    voting_clf1 = VotingClassifier(
+        estimators=[('rfc', RF_best), ('xgb', XG_best), ('gbc', GBM_best), ('ada', Ada_best)],
+        voting='soft', verbose=1, n_jobs=4)
+    voting_clf1.fit(X_train, y_train)
+    voting_pred=voting_clf1.predict(X_test)
+    accuracy  = accuracy_score(y_test, voting_pred)
+    print("soft voting 정확도: {0:.4f}".format(accuracy))
+    f.write("soft voting" + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(voting_clf1.best_params_) + '\n')
