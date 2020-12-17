@@ -293,6 +293,34 @@ img_width = 96
 batch_size = 96
 import pathlib
 
+
+def MakeFig(loss, accuracy, history, prefix):
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train_loss', 'val_loss'])
+    plt.grid(b=True, which='major', color='#666666', linestyle='-')
+    plt.minorticks_on()
+    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+    plt.title("<LOSS> test: {:0.4f}".format(loss))
+    suffix = datetime.datetime.now().strftime("%H%M%S")
+    plt.savefig(prefix + 'loss_' + suffix + '.png')
+    plt.clf()
+
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train_accuracy', 'val_accuracy'])
+    plt.grid(b=True, which='major', color='#666666', linestyle='-')
+    plt.minorticks_on()
+    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+    plt.title("<ACC> test: {:0.4f}".format(accuracy))
+    plt.savefig(prefix + 'acc_' + suffix + '.png')
+    plt.clf()
+
+
 dir = "/home/inje/py38torch/Machine_Learning/kaggle_bee_vs_wasp"
 
 if os.path.exists("./beevswasp_train.npz"):
@@ -386,9 +414,101 @@ if os.path.exists("./beevswasp_train.npz"):
 
     # for reproducibility
     import datetime
+    history = None
+    loss = None
+    accuracy = None
+    prefix = None
 
     if os.path.exists("./my_model_batch96_decay2000"):
-        model = K.models.load_model("my_model_batch96_decay2000")
+        path = './my_model_batch96_decay2000'
+        model = Model.load_weights("./my_model_batch96_decay2000")
+        print("load file")
+
+        num_images = X_train.shape[0]
+        epochs = 20
+        end_step = np.ceil(num_images / batch_size).astype(np.int32) * epochs
+        prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+        # Define model for pruning.
+        pruning_params = {
+            'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
+                                                                     final_sparsity=0.80,
+                                                                     begin_step=0,
+                                                                     end_step=end_step)
+        }
+
+        model_for_pruning = prune_low_magnitude(model, **pruning_params)
+
+        # `prune_low_magnitude` requires a recompile.
+        model_for_pruning.compile(optimizer='adam',
+                                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+                                  metrics=['accuracy'])
+
+        model_for_pruning.summary()
+        logdir = './logs/pruninglog'
+
+        callbacks = [
+            tfmot.sparsity.keras.UpdatePruningStep(),
+            tfmot.sparsity.keras.PruningSummaries(log_dir=logdir),
+        ]
+
+        pruned_history = model_for_pruning.fit(X_train, y_train,
+                              batch_size=batch_size, epochs=epochs, validation_data(X_val, y_val),
+                              callbacks=callbacks)
+        # type tensorboard --logdir=./logs/pruninglog  at terminal
+        print("pruning end")
+
+        model_for_pruning.save("my_pruning")
+        prefix = "prune_"
+        loss, accuracy = model_for_pruning.evaluate(X_test, y_test, verbose=1)
+        model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
+        MakeFig(loss, accuracy, pruned_history, prefix)
+
+        pruned_keras_file = './pruned_my_model_batch96_decay2000.h5'
+        tf.keras.models.save_model(model_for_export, pruned_keras_file, include_optimizer=False)
+        print('Saved pruned Keras model to:', pruned_keras_file)
+
+
+        def get_gzipped_model_size(file):
+            # Returns size of gzipped model, in bytes.
+            import os
+            import zipfile
+
+            _, zipped_file = tempfile.mkstemp('.zip')
+            with zipfile.ZipFile(zipped_file, 'w', compression=zipfile.ZIP_DEFLATED) as f:
+                f.write(file)
+
+            return os.path.getsize(zipped_file)
+
+        #make tflite model -> for quantization
+        converter = tf.lite.TFLiteConverter.from_keras_model(model_for_export)
+        pruned_tflite_model = converter.convert()
+
+        pruned_tflite_file = './prunedlite_my_model_batch96_decay2000.tflite'
+
+        with open(pruned_tflite_file, 'wb') as f:
+            f.write(pruned_tflite_model)
+
+        print('Saved pruned TFLite model to:', pruned_tflite_file)
+
+        print("Size of gzipped baseline Keras model: %.2f bytes" % (get_gzipped_model_size(path)))
+        print("Size of gzipped pruned TFlite model: %.2f bytes" % (get_gzipped_model_size(pruned_tflite_file)))
+        print("Size of gzipped pruned Keras model: %.2f bytes" % (get_gzipped_model_size(pruned_keras_file)))
+        # quantization
+        converter = tf.lite.TFLiteConverter.from_keras_model(model_for_export)
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        quantized_and_pruned_tflite_model = converter.convert()
+
+        prunedquantized_tflite_file = './prunedquantizedlite_my_model_batch96_decay2000.tflite'
+
+        with open(prunedquantized_tflite_file, 'wb') as f:
+            f.write(quantized_and_pruned_tflite_model)
+
+        print('Saved quantized and pruned TFLite model to:', prunedquantized_tflite_file)
+
+        print("Size of gzipped pruned and quantized TFlite model: %.2f bytes" % (
+            get_gzipped_model_size(prunedquantized_tflite_file)))
+
+
     else :
         model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
@@ -403,32 +523,9 @@ if os.path.exists("./beevswasp_train.npz"):
         loss, accuracy = model.evaluate(X_test, y_test, verbose=1)
         model.save("my_model_batch{}_decay2000".format(batch_size))
         print(accuracy)
+        prefix = "new"
 
 
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train_loss', 'val_loss'])
-    plt.grid(b=True, which='major', color='#666666', linestyle='-')
-    plt.minorticks_on()
-    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-    plt.title("<LOSS> test: {:0.4f}".format(loss))
-    suffix = datetime.datetime.now().strftime("%H%M%S")
-    plt.savefig('loss_' + suffix + '.png')
-    plt.clf()
-
-    plt.plot(history.history['accuracy'])
-    plt.plot(history.history['val_accuracy'])
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train_accuracy', 'val_accuracy'])
-    plt.grid(b=True, which='major', color='#666666', linestyle='-')
-    plt.minorticks_on()
-    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-    plt.title("<ACC> test: {:0.4f}".format(accuracy))
-    plt.savefig('acc_' + suffix + '.png')
-    plt.clf()
 
 
 else:
