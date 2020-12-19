@@ -1,19 +1,18 @@
 # import pandas as pd
 import numpy as np
-from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import AveragePooling2D
-from keras.layers.convolutional import MaxPooling2D
-from keras.layers.convolutional import ZeroPadding2D
-from keras.layers.core import Activation
-from keras.layers.core import Dense
-from keras.layers import Flatten
-from keras.models import Model
-from keras.layers import Input
-from keras.layers import add
-from keras.layers import Add
-from keras.regularizers import l2
-from keras import backend as K
+import tensorflow as tf
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import AveragePooling2D
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import ZeroPadding2D
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Add
+from tensorflow.keras.regularizers import l2
 import pickle
 import joblib
 
@@ -30,7 +29,8 @@ from sklearn.metrics import confusion_matrix, accuracy_score, roc_auc_score, pre
 # gpus = tf.config.experimental.list_physical_devices('GPU')
 from sklearn.svm import SVC
 
-import tensorflow as tf
+
+import tensorflow_model_optimization as tfmot
 import random
 import pandas as pd
 from pathlib import Path
@@ -163,10 +163,6 @@ class ResNet:
         inputShape = (height, width, depth)
         chanDim = -1
         print(reg, stages, filters)
-
-        if K.image_data_format() == "channels_first":
-            inputShape = (depth, height, width)
-            chanDim = 1
 
         inputs = Input(shape=inputShape)
         x = BatchNormalization(axis=chanDim, epsilon=bnEps,
@@ -305,11 +301,17 @@ def MakeFig(loss, accuracy, history, prefix):
     plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
     plt.title("<LOSS> test: {:0.4f}".format(loss))
     suffix = datetime.datetime.now().strftime("%H%M%S")
-    plt.savefig(prefix + 'loss_' + suffix + '.png')
+    fig = prefix + 'loss_' + suffix + '.png'
+    seed = 1
+
+    while os.path.exists(fig):
+        fig = prefix + 'loss_' + suffix + '_%d.png' % seed
+        seed += 1
+    plt.savefig(fig)
     plt.clf()
 
-    plt.plot(history.history['accuracy'])
-    plt.plot(history.history['val_accuracy'])
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
     plt.legend(['train_accuracy', 'val_accuracy'])
@@ -317,7 +319,13 @@ def MakeFig(loss, accuracy, history, prefix):
     plt.minorticks_on()
     plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
     plt.title("<ACC> test: {:0.4f}".format(accuracy))
-    plt.savefig(prefix + 'acc_' + suffix + '.png')
+    fig = prefix + 'acc_' + suffix + '.png'
+    seed = 1
+
+    while os.path.exists(fig):
+        fig = prefix + 'acc_' + suffix + '_%d.png' % seed
+        seed += 1
+    plt.savefig(fig)
     plt.clf()
 
 
@@ -419,71 +427,87 @@ if os.path.exists("./beevswasp_train.npz"):
     accuracy = None
     prefix = None
 
-    if os.path.exists("./my_model_batch96_decay2000"):
-        path = './my_model_batch96_decay2000'
-        model = Model.load_weights("./my_model_batch96_decay2000")
+    if os.path.exists("./my_model_batch96_decay3000"):
+        path = './my_model_batch96_decay3000'
+        model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
+        model.load_weights("/home/inje/py38torch/Machine_Learning/my_model_batch96_decay3000")
         print("load file")
+        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        loss, accuracy = model.evaluate(X_test, y_test)
+        print("base line model")
+        print("loss : {:0.4f}, acc : {:0.4f}".format(loss, accuracy))
+        pruned_keras_file = None
+        model_for_export = None
+        if os.path.exists("./my_pruning"):
+            print("exist pruning")
+            model_for_export = tf.keras.models.load_model("./pruned_my_model_batch96_decay3000.h5")
+            pruned_keras_file = "./pruned_my_model_batch96_decay3000.h5"
+        else:
+            print("new pruning")
+            num_images = X_train.shape[0]
+            epochs = 5
+            end_step = np.ceil(num_images / batch_size).astype(np.int32) * epochs
+            prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
+            # Define model for pruning.
+            pruning_params = {
+                'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
+                                                                         final_sparsity=0.80,
+                                                                         begin_step=0,
+                                                                         end_step=end_step)
+            }
 
-        num_images = X_train.shape[0]
-        epochs = 20
-        end_step = np.ceil(num_images / batch_size).astype(np.int32) * epochs
-        prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
-        # Define model for pruning.
-        pruning_params = {
-            'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
-                                                                     final_sparsity=0.80,
-                                                                     begin_step=0,
-                                                                     end_step=end_step)
-        }
+            model_for_pruning = prune_low_magnitude(model, **pruning_params)
 
-        model_for_pruning = prune_low_magnitude(model, **pruning_params)
+            # `prune_low_magnitude` requires a recompile.
+            model_for_pruning.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-        # `prune_low_magnitude` requires a recompile.
-        model_for_pruning.compile(optimizer='adam',
-                                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                                  metrics=['accuracy'])
+            model_for_pruning.summary()
+            logdir = './logs/pruninglog'
 
-        model_for_pruning.summary()
-        logdir = './logs/pruninglog'
+            callbacks = [
+                tfmot.sparsity.keras.UpdatePruningStep(),
+                tfmot.sparsity.keras.PruningSummaries(log_dir=logdir),
+            ]
 
-        callbacks = [
-            tfmot.sparsity.keras.UpdatePruningStep(),
-            tfmot.sparsity.keras.PruningSummaries(log_dir=logdir),
-        ]
+            pruned_history = model_for_pruning.fit(X_train, y_train,
+                                  batch_size=64, epochs=epochs, validation_data=(X_val, y_val),
+                                  callbacks=callbacks)
+            # type tensorboard --logdir=./logs/pruninglog  at terminal
+            print("pruning end")
 
-        pruned_history = model_for_pruning.fit(X_train, y_train,
-                              batch_size=batch_size, epochs=epochs, validation_data(X_val, y_val),
-                              callbacks=callbacks)
-        # type tensorboard --logdir=./logs/pruninglog  at terminal
-        print("pruning end")
+            model_for_pruning.save("my_pruning")
+            prefix = "prune_"
+            loss, accuracy = model_for_pruning.evaluate(X_test, y_test, verbose=1)
+            model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
+            MakeFig(loss, accuracy, pruned_history, prefix)
 
-        model_for_pruning.save("my_pruning")
-        prefix = "prune_"
-        loss, accuracy = model_for_pruning.evaluate(X_test, y_test, verbose=1)
-        model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
-        MakeFig(loss, accuracy, pruned_history, prefix)
-
-        pruned_keras_file = './pruned_my_model_batch96_decay2000.h5'
-        tf.keras.models.save_model(model_for_export, pruned_keras_file, include_optimizer=False)
-        print('Saved pruned Keras model to:', pruned_keras_file)
+            pruned_keras_file = './pruned_my_model_batch96_decay3000.h5'
+            tf.keras.models.save_model(model_for_export, pruned_keras_file, include_optimizer=False)
+            print('Saved pruned Keras model to:', pruned_keras_file)
 
 
         def get_gzipped_model_size(file):
             # Returns size of gzipped model, in bytes.
             import os
             import zipfile
+            seed = 1
 
-            _, zipped_file = tempfile.mkstemp('.zip')
+            zipped_file = './CompressedData.zip'
+            while os.path.exists(zipped_file):
+                zipped_file = './CompressedData_%d.zip' % seed
+                seed += 1
+
             with zipfile.ZipFile(zipped_file, 'w', compression=zipfile.ZIP_DEFLATED) as f:
                 f.write(file)
 
             return os.path.getsize(zipped_file)
 
         #make tflite model -> for quantization
+
         converter = tf.lite.TFLiteConverter.from_keras_model(model_for_export)
         pruned_tflite_model = converter.convert()
 
-        pruned_tflite_file = './prunedlite_my_model_batch96_decay2000.tflite'
+        pruned_tflite_file = './prunedlite_my_model_batch96_decay3000.tflite'
 
         with open(pruned_tflite_file, 'wb') as f:
             f.write(pruned_tflite_model)
@@ -498,7 +522,7 @@ if os.path.exists("./beevswasp_train.npz"):
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         quantized_and_pruned_tflite_model = converter.convert()
 
-        prunedquantized_tflite_file = './prunedquantizedlite_my_model_batch96_decay2000.tflite'
+        prunedquantized_tflite_file = './prunedquantizedlite_my_model_batch96_decay3000.tflite'
 
         with open(prunedquantized_tflite_file, 'wb') as f:
             f.write(quantized_and_pruned_tflite_model)
@@ -513,7 +537,7 @@ if os.path.exists("./beevswasp_train.npz"):
         model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1e-3,
-            decay_steps=2000,
+            decay_steps=3000,
             decay_rate=0.96,
             staircase=True)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -521,9 +545,10 @@ if os.path.exists("./beevswasp_train.npz"):
         history = model.fit(X_train, y_train, epochs=30,
                             validation_data=(X_val, y_val), batch_size=batch_size, verbose=1)
         loss, accuracy = model.evaluate(X_test, y_test, verbose=1)
-        model.save("my_model_batch{}_decay2000".format(batch_size))
+        model.save("my_model_batch{}_decay3000".format(batch_size))
         print(accuracy)
         prefix = "new"
+        MakeFig(loss, accuracy, history, prefix)
 
 
 
