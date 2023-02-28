@@ -39,7 +39,7 @@ from glob import glob
 
 # from fastai.vision.all import *
 # from fastai.metrics import error_rate
-print(tf.keras.__version__)
+print(tf.__version__)
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
     try:
@@ -62,7 +62,7 @@ def AugImage(image):
     enhancer = ImageEnhance.Brightness(image)
     brightness_image = enhancer.enhance(Seed1)
 
-    # 좌우 대칭
+    # Brightness
     if (Seed > 0.3):
         horizonal_flip_image = brightness_image.transpose(Image.FLIP_LEFT_RIGHT)
     else:
@@ -118,7 +118,8 @@ data: input to the residual module
 K: number of filters that will be learned by the final CONV layer (the first two CONV layers will learn K/4 filters)
 stride: controls the stride of the convolution (will help us reduce spatial dimensions without using max pooling)
 chanDim: defines the axis which will perform batch normalization
-red (i.e. reduce) will control whether we are reducing spatial dimensions (True) or not (False) as not all residual modules will reduce dimensions of our spatial volume
+red (i.e. reduce) will control whether we are reducing spatial dimensions (True) or not (False)
+    as not all residual modules will reduce dimensions of our spatial volume
 reg: applies regularization strength for all CONV layers in the residual module
 bnEps: controls the Ɛ responsible for avoiding “division by zero” errors when normalizing inputs
 bnMom: controls the momentum for the moving average
@@ -129,18 +130,14 @@ bnMom: controls the momentum for the moving average
 class ResNet:
     @staticmethod
     def residual_module(data, K, stride, chanDim, red=False,
-                        reg=1e-4, bnEps=2e-5, bnMom=0.9):
+                        reg=5e-4, bnEps=1e-8, bnMom=0.96):
         print(reg, stride, chanDim, data)
         shortcut = data
+        # BN returns (batch - mean(batch)) / (var(batch) + epsilon) * gamma + beta
         bn1 = BatchNormalization(axis=chanDim, epsilon=bnEps, momentum=bnMom)(data)
         act1 = Activation("relu")(bn1)
         conv1 = Conv2D(int(K * 0.25), (1, 1), use_bias=False,
                        kernel_regularizer=l2(reg))(act1)
-        """
-        Notice that the bias term is turned off for the CONV layer, 
-        as the biases are already in the following BN layers 
-        so there’s no need for a second bias term.        
-        """
         bn2 = BatchNormalization(axis=chanDim, epsilon=bnEps, momentum=bnMom)(conv1)
         act2 = Activation("relu")(bn2)
         conv2 = Conv2D(int(K * 0.25), (3, 3), strides=stride, padding="same", use_bias=False,
@@ -198,83 +195,6 @@ class ResNet:
         model = Model(inputs, x, name="resnet")
         return model
 
-#
-# class MyModel:
-#     @staticmethod
-#     def residual_module(data, K, stride, chanDim, red=False,
-#                         reg=1e-4, bnEps=2e-5, bnMom=0.9):
-#         print(reg, stride, chanDim, data)
-#         shortcut = data
-#         bn1 = BatchNormalization(axis=chanDim, epsilon=bnEps, momentum=bnMom)(data)
-#         act1 = Activation("relu")(bn1)
-#         conv1 = Conv2D(int(K * 0.25), (1, 1), use_bias=False,
-#                        kernel_regularizer=l2(reg))(act1)
-#         """
-#         Notice that the bias term is turned off for the CONV layer,
-#         as the biases are already in the following BN layers
-#         so there’s no need for a second bias term.
-#         """
-#         bn2 = BatchNormalization(axis=chanDim, epsilon=bnEps, momentum=bnMom)(conv1)
-#         act2 = Activation("relu")(bn2)
-#         conv2 = Conv2D(int(K * 0.25), (3, 3), strides=stride, padding="same", use_bias=False,
-#                        kernel_regularizer=l2(reg))(act2)
-#
-#         bn3 = BatchNormalization(axis=chanDim, epsilon=bnEps, momentum=bnMom)(conv2)
-#         act3 = Activation("relu")(bn3)
-#         conv3 = Conv2D(K, (1, 1), use_bias=False, kernel_regularizer=l2(reg))(act3)
-#
-#         if red:
-#             shortcut = Conv2D(K, (1, 1), strides=stride, use_bias=False,
-#                               kernel_regularizer=l2(reg))(act1)
-#         d1 = Add()
-#         x = d1([conv3, shortcut])
-#
-#         return x
-#
-#     @staticmethod
-#     def build(width, height, depth, classes, stages, filters, reg=0.0001, bnEps=2e-5, bnMom=0.9):
-#         inputShape = (height, width, depth)
-#         chanDim = -1
-#         print(reg, stages, filters)
-#
-#         if K.image_data_format() == "channels_first":
-#             inputShape = (depth, height, width)
-#             chanDim = 1
-#
-#         inputs = Input(shape=inputShape)
-#         x = BatchNormalization(axis=chanDim, epsilon=bnEps,
-#                                momentum=bnMom)(inputs)
-#
-#         x = Conv2D(filters[0], (5, 5), use_bias=False,
-#                    padding="same", kernel_regularizer=l2(reg))(x)
-#         x = BatchNormalization(axis=chanDim, epsilon=bnEps,
-#                                momentum=bnMom)(x)
-#         x = Activation("relu")(x)
-#         x = ZeroPadding2D((1, 1))(x)
-#         x = MaxPooling2D((3, 3), strides=(2, 2))(x)
-#
-#         for i in range(0, len(stages)):
-#             stride = (1, 1) if i == 0 else (2, 2)
-#             x = ResNet.residual_module(x, filters[i + 1], stride,
-#                                        chanDim, red=True, bnEps=bnEps, bnMom=bnMom)
-#             print("x shape:", x)
-#
-#             for j in range(0, stages[i] - 1):
-#                 x = ResNet.residual_module(x, filters[i + 1],
-#                                            (1, 1), chanDim, bnEps=bnEps, bnMom=bnMom)
-#
-#         x = BatchNormalization(axis=chanDim, epsilon=bnEps,
-#                                momentum=bnMom)(x)
-#         x = Activation("relu")(x)
-#         x = AveragePooling2D((8, 8))(x)
-#         # print(x)
-#         x = Flatten()(x)
-#         x = Dense(classes, kernel_regularizer=l2(reg))(x)
-#         print(x)
-#         x = Activation("softmax")(x)
-#         model = Model(inputs, x, name="mymodel")
-#         return model
-
 
 bs = 64  # batch size
 resize_size = 96  # for training
@@ -310,8 +230,8 @@ def MakeFig(loss, accuracy, history, prefix):
     plt.savefig(fig)
     plt.clf()
 
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_accuracy'])
     plt.ylabel('accuracy')
     plt.xlabel('epoch')
     plt.legend(['train_accuracy', 'val_accuracy'])
@@ -330,26 +250,43 @@ def MakeFig(loss, accuracy, history, prefix):
 
 
 dir = "/home/inje/py38torch/Machine_Learning/kaggle_bee_vs_wasp"
-
+test_SCI = 0
 if os.path.exists("./beevswasp_train.npz"):
     np_load_old = np.load
     np.load = lambda *a, **k: np_load_old(*a, allow_pickle=True, **k)
-    C = np.load("./beevswasp_val.npz")
-    X_val, y_val = C['x'], C['y']
-    B = np.load("./beevswasp_train.npz")
-    X_train, y_train = B['x'], B['y']
-    A = np.load("./beevswasp_test.npz")
-    X_test, y_test = A['x'], A['y']
-    print(X_train.shape, y_train[0])
-    print(X_val.shape)
-    print(X_test.shape)
+
+    if test_SCI == 1:
+        C = np.load("./beevswasp_val_lab.npz")
+        X_val, y_val = C['x'], C['y']
+        B = np.load("./beevswasp_train_lab.npz")
+        X_train, y_train = B['x'], B['y']
+        A = np.load("./beevswasp_test_lab.npz")
+        X_test, y_test = A['x'], A['y']
+        X_train = X_train.reshape(7939, 27648)
+        X_val = X_val.reshape(1719, 27648)
+        X_test = X_test.reshape(1763, 27648)
+        X_train = X_train.astype(float) / 255
+        X_val = X_val.astype(float) / 255
+        X_test = X_test.astype(float) / 255
+        print(X_train.shape, y_train[0])
+        print(X_val.shape)
+        print(X_test.shape)
+    elif test_SCI ==0:
+        C = np.load("./beevswasp_val.npz")
+        X_val, y_val = C['x'], C['y']
+        B = np.load("./beevswasp_train.npz")
+        X_train, y_train = B['x'], B['y']
+        A = np.load("./beevswasp_test.npz")
+        X_test, y_test = A['x'], A['y']
+        # X_train = X_train.astype(float) / 255
+        # X_val = X_val.astype(float) / 255
+        # X_test = X_test.astype(float) / 255
+        print(X_train.shape, y_train[0])
+        print(X_val.shape)
+        print(X_test.shape)
     # activate when using Machine Learning
-    # X_train = X_train.reshape(7939, 27648)
-    # X_val = X_val.reshape(1719, 27648)
-    # X_test = X_test.reshape(1763, 27648)
-    # X_train = X_train.astype(float) / 255
-    # X_val = X_val.astype(float) / 255
-    # X_test = X_test.astype(float) / 255
+
+
 
     # y_train = tf.keras.utils.to_categorical(y_train)
     # y_val = tf.keras.utils.to_categorical(y_val)
@@ -379,46 +316,67 @@ if os.path.exists("./beevswasp_train.npz"):
         s = pickle.dumps(gsSVC)
         joblib.dump(s, 'SVCmodel.pkl')"""
 
-        # filename = 'SVCmodel.pkl'
-        #
-        # with open(filename, 'rb') as file:
-        #     loaded_model = pickle.loads(joblib.load(file))
-        #
-        #     y_test_pred = loaded_model.predict(X_test)
-        #     accuracy = accuracy_score(y_test, y_test_pred)
-        #
-        #     ConMatrix = confusion_matrix(y_test, y_test_pred)
-        #     ClassReport = classification_report(y_test, y_test_pred)
-        #     print("Confusion Matrix Score:\n", ConMatrix)
-        #     print("Classification Report: \n", ClassReport)
-        #     f.write(
-        #         "{}".format(loaded_model.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(
-        #             loaded_model.best_params_) + '\n')
-        # xgboost.XGBClassifier()
-        #
-        # XGB_best = xgboost.XGBClassifier()
-        # XG_param = {"max_depth": [2, 4],
-        #             'min_child_weight': [3, 6],
-        #             'gamma': [0],
-        #             'learning_rate': [0.5, 0.7],
-        #             'random_state': [42]}
-        # gsXG = GridSearchCV(XGB_best, XG_param, scoring='accuracy', verbose=2, n_jobs=4)
-        # gsXG.fit(X_train, y_train)
-        # t = pickle.dumps(gsXG)
-        # joblib.dump(t, 'XGmodel.pkl')
-        # XG_best = gsXG.best_estimator_
-        # print(gsXG.classes_, gsXG.best_params_, gsXG.best_score_)
-        # XG_pred = XG_best.predict(X_test)
-        # accuracy = accuracy_score(y_test, XG_pred)
-        # print("XGB 정확도: {0:.4f}".format(accuracy))
-        # ConMatrix = confusion_matrix(y_test, XG_pred)
-        # ClassReport = classification_report(y_test, XG_pred)
-        # f.write(
-        #     "{}".format(gsXG.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsXG.best_params_) + '\n')
-        # print("Confusion Matrix Score:")
-        # print(ConMatrix)
-        # print("Classification Report:")
-        # print(ClassReport)
+        if test_SCI ==1:
+
+
+            filename1 = 'SVCmodel.pkl'
+            filename2 = 'XGmodel.pkl'
+
+            with open(filename1, 'rb') as file:
+                loaded_model = pickle.loads(joblib.load(file))
+
+                y_test_pred = loaded_model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_test_pred)
+
+                ConMatrix = confusion_matrix(y_test, y_test_pred)
+                ClassReport = classification_report(y_test, y_test_pred)
+                print("Confusion Matrix Score:\n", ConMatrix)
+                print("Classification Report: \n", ClassReport)
+                f.write(
+                    "{}".format(loaded_model.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(
+                        loaded_model.best_params_) + '\n')
+
+            with open(filename2, 'rb') as file:
+                loaded_model = pickle.loads(joblib.load(file))
+
+                y_test_pred = loaded_model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_test_pred)
+
+                ConMatrix = confusion_matrix(y_test, y_test_pred)
+                ClassReport = classification_report(y_test, y_test_pred)
+                print("Confusion Matrix Score:\n", ConMatrix)
+                print("Classification Report: \n", ClassReport)
+                f.write(
+                    "{}".format(loaded_model.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(
+                        loaded_model.best_params_) + '\n')
+            x = 5
+            assert x % 3 == 0, 'end test.'
+            xgboost.XGBClassifier()
+
+            XGB_best = xgboost.XGBClassifier()
+            XG_param = {"max_depth": [2, 4],
+                        'min_child_weight': [3, 6],
+                        'gamma': [0],
+                        'learning_rate': [0.5, 0.7],
+                        'random_state': [42]}
+            gsXG = GridSearchCV(XGB_best, XG_param, scoring='accuracy', verbose=2, n_jobs=4)
+            gsXG.fit(X_train, y_train)
+            t = pickle.dumps(gsXG)
+            joblib.dump(t, 'XGmodel.pkl')
+            XG_best = gsXG.best_estimator_
+            print(gsXG.classes_, gsXG.best_params_, gsXG.best_score_)
+            XG_pred = XG_best.predict(X_test)
+            accuracy = accuracy_score(y_test, XG_pred)
+            print("XGB 정확도: {0:.4f}".format(accuracy))
+            ConMatrix = confusion_matrix(y_test, XG_pred)
+            ClassReport = classification_report(y_test, XG_pred)
+            f.write(
+                "{}".format(gsXG.__class__) + ',' + "{0:.4f}".format(accuracy) + ',' + "{}".format(gsXG.best_params_) + '\n')
+            print("Confusion Matrix Score:")
+            print(ConMatrix)
+            print("Classification Report:")
+            print(ClassReport)
+
 
     # for reproducibility
     import datetime
@@ -427,31 +385,36 @@ if os.path.exists("./beevswasp_train.npz"):
     accuracy = None
     prefix = None
 
-    if os.path.exists("./my_model_batch96_decay3000"):
-        path = './my_model_batch96_decay3000'
-        model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
-        model.load_weights("/home/inje/py38torch/Machine_Learning/my_model_batch96_decay3000")
+    if os.path.exists("./my_model_batch96_decay5000"):
+        path = './my_model_batch96_decay5000'
+        # model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
+        model = tf.keras.models.load_model("/home/inje/py38torch/Machine_Learning/my_model_batch96_decay5000")
         print("load file")
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         loss, accuracy = model.evaluate(X_test, y_test)
         print("base line model")
         print("loss : {:0.4f}, acc : {:0.4f}".format(loss, accuracy))
         pruned_keras_file = None
         model_for_export = None
-        if os.path.exists("./my_pruning"):
+        if os.path.exists("./my_pruning5000"):
             print("exist pruning")
-            model_for_export = tf.keras.models.load_model("./pruned_my_model_batch96_decay3000.h5")
-            pruned_keras_file = "./pruned_my_model_batch96_decay3000.h5"
+            model_for_export = tf.keras.models.load_model("./pruned_my_model_batch96_decay5000.h5")
+            pruned_keras_file = "./pruned_my_model_batch96_decay5000.h5"
+            model_for_export.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+            loss, accuracy = model_for_export.evaluate(X_test, y_test, verbose=1)
+            print("pruned model")
+            print("loss : {:0.4f}, acc : {:0.4f}".format(loss, accuracy))
         else:
             print("new pruning")
             num_images = X_train.shape[0]
-            epochs = 5
-            end_step = np.ceil(num_images / batch_size).astype(np.int32) * epochs
+            epochs = 10
+            bc = 64
+            end_step = np.ceil(num_images / bc).astype(np.int32) * epochs
             prune_low_magnitude = tfmot.sparsity.keras.prune_low_magnitude
             # Define model for pruning.
             pruning_params = {
                 'pruning_schedule': tfmot.sparsity.keras.PolynomialDecay(initial_sparsity=0.50,
-                                                                         final_sparsity=0.80,
+                                                                         final_sparsity=0.90,
                                                                          begin_step=0,
                                                                          end_step=end_step)
             }
@@ -462,7 +425,7 @@ if os.path.exists("./beevswasp_train.npz"):
             model_for_pruning.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
             model_for_pruning.summary()
-            logdir = './logs/pruninglog'
+            logdir = './logs/pruninglog5000'
 
             callbacks = [
                 tfmot.sparsity.keras.UpdatePruningStep(),
@@ -470,18 +433,18 @@ if os.path.exists("./beevswasp_train.npz"):
             ]
 
             pruned_history = model_for_pruning.fit(X_train, y_train,
-                                  batch_size=64, epochs=epochs, validation_data=(X_val, y_val),
+                                  batch_size=bc, epochs=epochs, validation_data=(X_val, y_val),
                                   callbacks=callbacks)
-            # type tensorboard --logdir=./logs/pruninglog  at terminal
+            # type tensorboard --logdir=./logs/pruninglog5000  at terminal
             print("pruning end")
 
-            model_for_pruning.save("my_pruning")
+            model_for_pruning.save("my_pruning5000")
             prefix = "prune_"
             loss, accuracy = model_for_pruning.evaluate(X_test, y_test, verbose=1)
             model_for_export = tfmot.sparsity.keras.strip_pruning(model_for_pruning)
             MakeFig(loss, accuracy, pruned_history, prefix)
 
-            pruned_keras_file = './pruned_my_model_batch96_decay3000.h5'
+            pruned_keras_file = './pruned_my_model_batch96_decay5000.h5'
             tf.keras.models.save_model(model_for_export, pruned_keras_file, include_optimizer=False)
             print('Saved pruned Keras model to:', pruned_keras_file)
 
@@ -492,9 +455,9 @@ if os.path.exists("./beevswasp_train.npz"):
             import zipfile
             seed = 1
 
-            zipped_file = './CompressedData.zip'
+            zipped_file = './CompressedData5000.zip'
             while os.path.exists(zipped_file):
-                zipped_file = './CompressedData_%d.zip' % seed
+                zipped_file = './CompressedData5000_%d.zip' % seed
                 seed += 1
 
             with zipfile.ZipFile(zipped_file, 'w', compression=zipfile.ZIP_DEFLATED) as f:
@@ -507,14 +470,14 @@ if os.path.exists("./beevswasp_train.npz"):
         converter = tf.lite.TFLiteConverter.from_keras_model(model_for_export)
         pruned_tflite_model = converter.convert()
 
-        pruned_tflite_file = './prunedlite_my_model_batch96_decay3000.tflite'
+        pruned_tflite_file = './prunedlite_my_model_batch96_decay5000.tflite'
 
         with open(pruned_tflite_file, 'wb') as f:
             f.write(pruned_tflite_model)
 
         print('Saved pruned TFLite model to:', pruned_tflite_file)
 
-        print("Size of gzipped baseline Keras model: %.2f bytes" % (get_gzipped_model_size(path)))
+        # print("Size of gzipped baseline Keras model: %.2f bytes" % (get_gzipped_model_size(path)))
         print("Size of gzipped pruned TFlite model: %.2f bytes" % (get_gzipped_model_size(pruned_tflite_file)))
         print("Size of gzipped pruned Keras model: %.2f bytes" % (get_gzipped_model_size(pruned_keras_file)))
         # quantization
@@ -522,7 +485,7 @@ if os.path.exists("./beevswasp_train.npz"):
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         quantized_and_pruned_tflite_model = converter.convert()
 
-        prunedquantized_tflite_file = './prunedquantizedlite_my_model_batch96_decay3000.tflite'
+        prunedquantized_tflite_file = './prunedquantizedlite_my_model_batch96_decay5000.tflite'
 
         with open(prunedquantized_tflite_file, 'wb') as f:
             f.write(quantized_and_pruned_tflite_model)
@@ -537,15 +500,14 @@ if os.path.exists("./beevswasp_train.npz"):
         model = ResNet.build(96, 96, 3, 4, (3, 4, 6), (64, 128, 256, 512), reg=0.0005)
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             initial_learning_rate=1e-3,
-            decay_steps=3000,
-            decay_rate=0.96,
-            staircase=True)
+            decay_steps=5000,
+            decay_rate=0.96)
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         model.summary()
         history = model.fit(X_train, y_train, epochs=30,
                             validation_data=(X_val, y_val), batch_size=batch_size, verbose=1)
         loss, accuracy = model.evaluate(X_test, y_test, verbose=1)
-        model.save("my_model_batch{}_decay3000".format(batch_size))
+        model.save("my_model_batch{}_decay5000".format(batch_size))
         print(accuracy)
         prefix = "new"
         MakeFig(loss, accuracy, history, prefix)
@@ -573,10 +535,12 @@ else:
     valLabel = []
     testImg = []
     testLabel = []
-    # arr0 = [1, 0, 0, 0]
-    # arr1 = [0, 1, 0, 0]
-    # arr2 = [0, 0, 1, 0]
-    # arr3 = [0, 0, 0, 1]
+    ## for one-hot vector
+    if test_SCI == 0:
+        arr0 = [1, 0, 0, 0]
+        arr1 = [0, 1, 0, 0]
+        arr2 = [0, 0, 1, 0]
+        arr3 = [0, 0, 0, 1]
     for i, j in zip(train.path, train.label):
         imgpath = dir + "/" + i
         # print(imgpath, j)
@@ -586,40 +550,42 @@ else:
 
         data = np.asarray(img)
         trainImg.append(data)
-        for _ in range(0, 10):
-            tmp = AugImage(img)
-            data1 = np.asarray(tmp)
-            trainImg.append(data1)
-            trainLabel.append(j)
-        trainLabel.append(j)
-        # if j == 'bee':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         trainImg.append(data1)
-        #         trainLabel.append(arr0)
-        #     trainLabel.append(arr0)
-        # elif j == 'wasp':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         trainImg.append(data1)
-        #         trainLabel.append(arr1)
-        #     trainLabel.append(arr1)
-        # elif j == 'insect':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         trainImg.append(data1)
-        #         trainLabel.append(arr2)
-        #     trainLabel.append(arr2)
-        # else:
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         trainImg.append(data1)
-        #         trainLabel.append(arr3)
-        #     trainLabel.append(arr3)
+        ## for labeling
+        # for _ in range(0, 10):
+        #     tmp = AugImage(img)
+        #     data1 = np.asarray(tmp)
+        #     trainImg.append(data1)
+        #     trainLabel.append(j)
+        # trainLabel.append(j)
+        ## for one-hot vector
+        if j == 'bee':
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                trainImg.append(data1)
+                trainLabel.append(arr0)
+            trainLabel.append(arr0)
+        elif j == 'wasp':
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                trainImg.append(data1)
+                trainLabel.append(arr1)
+            trainLabel.append(arr1)
+        elif j == 'insect':
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                trainImg.append(data1)
+                trainLabel.append(arr2)
+            trainLabel.append(arr2)
+        else:
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                trainImg.append(data1)
+                trainLabel.append(arr3)
+            trainLabel.append(arr3)
 
     for i, j in zip(val.path, val.label):
         imgpath = dir + "/" + i
@@ -628,41 +594,45 @@ else:
         img = img.resize((img_height, img_height))
         data = np.asarray(img)
         valImg.append(data)
-        # if j == 'bee':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         valImg.append(data1)
-        #         valLabel.append(arr0)
-        #     valLabel.append(arr0)
-        # elif j == 'wasp':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         valImg.append(data1)
-        #         valLabel.append(arr1)
-        #
-        #     valLabel.append(arr1)
-        # elif j == 'insect':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         valImg.append(data1)
-        #         valLabel.append(arr2)
-        #     valLabel.append(arr2)
-        # else:
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         valImg.append(data1)
-        #         valLabel.append(arr3)
-        #     valLabel.append(arr3)
-        for _ in range(0, 10):
-            tmp = AugImage(img)
-            data1 = np.asarray(tmp)
-            valImg.append(data1)
+        ##for one-hot vector
+        if test_SCI == 0:
+            if j == 'bee':
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    valImg.append(data1)
+                    valLabel.append(arr0)
+                valLabel.append(arr0)
+            elif j == 'wasp':
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    valImg.append(data1)
+                    valLabel.append(arr1)
+
+                valLabel.append(arr1)
+            elif j == 'insect':
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    valImg.append(data1)
+                    valLabel.append(arr2)
+                valLabel.append(arr2)
+            else:
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    valImg.append(data1)
+                    valLabel.append(arr3)
+                valLabel.append(arr3)
+        ##for labeling
+        elif test_SCI == 1:
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                valImg.append(data1)
+                valLabel.append(j)
             valLabel.append(j)
-        valLabel.append(j)
 
     for i, j in zip(test.path, test.label):
         imgpath = dir + "/" + i
@@ -671,51 +641,80 @@ else:
         img = img.resize((img_height, img_height))
         data = np.asarray(img)
         testImg.append(data)
-        # if j == 'bee':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         testImg.append(data1)
-        #         testLabel.append(arr0)
-        #     testLabel.append(arr0)
-        # elif j == 'wasp':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         testImg.append(data1)
-        #         testLabel.append(arr1)
-        #     testLabel.append(arr1)
-        # elif j == 'insect':
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         testImg.append(data1)
-        #         testLabel.append(arr2)
-        #     testLabel.append(arr2)
-        # else:
-        #     for _ in range(0, 10):
-        #         tmp = AugImage(img)
-        #         data1 = np.asarray(tmp)
-        #         testImg.append(data1)
-        #         testLabel.append(arr3)
-        #     testLabel.append(arr3)
+        ##for one-hot vector
+        if test_SCI == 0:
+            if j == 'bee':
+                for _ in range(0, 15):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    testImg.append(data1)
+                    testLabel.append(arr0)
+                testLabel.append(arr0)
+            elif j == 'wasp':
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    testImg.append(data1)
+                    testLabel.append(arr1)
+                testLabel.append(arr1)
+            elif j == 'insect':
+                for _ in range(0, 20):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    testImg.append(data1)
+                    testLabel.append(arr2)
+                testLabel.append(arr2)
+            else:
+                for _ in range(0, 10):
+                    tmp = AugImage(img)
+                    data1 = np.asarray(tmp)
+                    testImg.append(data1)
+                    testLabel.append(arr3)
+                testLabel.append(arr3)
         # testLabel.append(j)
+        elif test_SCI == 1:
+            for _ in range(0, 10):
+                tmp = AugImage(img)
+                data1 = np.asarray(tmp)
+                testImg.append(data1)
+                testLabel.append(j)
+            testLabel.append(j)
 
-    X1 = np.array(trainImg)
+    if test_SCI == 1:
+        X1 = np.array(trainImg)
+        y1 = np.array(trainLabel)
+        print(y1[0:5])
 
-    y1 = np.array(trainLabel)
-    print(y1[0:5])
+        np.savez("./beevswasp_train_lab.npz", x=X1, y=y1)
+        print("done", len(y1), len(X1))
+        X1 = np.array(valImg)
+        y1 = np.array(valLabel)
 
-    np.savez("./beevswasp_train.npz", x=X1, y=y1)
-    print("done", len(y1), len(X1))
-    X1 = np.array(valImg)
-    y1 = np.array(valLabel)
+        np.savez("./beevswasp_val_lab.npz", x=X1, y=y1)
+        print("done", len(y1), len(X1))
 
-    np.savez("./beevswasp_val.npz", x=X1, y=y1)
-    print("done", len(y1), len(X1))
+        X1 = np.array(testImg)
+        y1 = np.array(testLabel)
 
-    X1 = np.array(testImg)
-    y1 = np.array(testLabel)
+        np.savez("./beevswasp_test_lab.npz", x=X1, y=y1)
+        print("done", len(y1))
+    elif test_SCI == 0:
+        X1 = np.array(trainImg)
+        y1 = np.array(trainLabel)
+        print(y1[0:5])
 
-    np.savez("./beevswasp_test.npz", x=X1, y=y1)
-    print("done", len(y1))
+        np.savez("./beevswasp_train.npz", x=X1, y=y1)
+        print("done", len(y1), len(X1))
+        X1 = np.array(valImg)
+        y1 = np.array(valLabel)
+
+        np.savez("./beevswasp_val.npz", x=X1, y=y1)
+        print("done", len(y1), len(X1))
+
+        X1 = np.array(testImg)
+        y1 = np.array(testLabel)
+
+        np.savez("./beevswasp_test.npz", x=X1, y=y1)
+        print("done", len(y1))
+
+

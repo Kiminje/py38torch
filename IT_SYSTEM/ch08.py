@@ -7,6 +7,8 @@ from scipy.signal import convolve2d
 from scipy.signal import correlate
 from scipy.signal import correlate2d
 from sklearn.model_selection import train_test_split
+import keras
+from keras_preprocessing import image
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras import regularizers
@@ -193,6 +195,46 @@ layers = [10]
 Ratios = [0.25]
 i = 1e-5
 j = 1e-5
+def MakeFig(loss, accuracy, history, prefix):
+    import os, datetime
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train_loss', 'val_loss'])
+    plt.grid(b=True, which='major', color='#666666', linestyle='-')
+    plt.minorticks_on()
+    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+    plt.title("<LOSS> test: {:0.4f}".format(loss))
+    suffix = datetime.datetime.now().strftime("%H%M%S")
+    fig = prefix + 'loss_' + suffix + '.png'
+    seed = 1
+
+    while os.path.exists(fig):
+        fig = prefix + 'loss_' + suffix + '_%d.zip' % seed
+        seed += 1
+    plt.savefig(fig)
+    plt.clf()
+
+    plt.plot(history.history['acc'])
+    plt.plot(history.history['val_acc'])
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train_accuracy', 'val_accuracy'])
+    plt.grid(b=True, which='major', color='#666666', linestyle='-')
+    plt.minorticks_on()
+    plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+    plt.title("<ACC> test: {:0.4f}".format(accuracy))
+    fig = prefix + 'acc_' + suffix + '.png'
+    seed = 1
+
+    while os.path.exists(fig):
+        fig = prefix + 'acc_' + suffix + '_%d.zip' % seed
+        seed += 1
+    plt.savefig(fig)
+    plt.clf()
+
+
 for Ch in ChNums:
     for Layer in layers:
         Split = Layer // 2
@@ -218,32 +260,34 @@ for Ch in ChNums:
             conv2.summary()
 
             conv2.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-            history = conv2.fit(x_train, y_train_encoded, batch_size=32, epochs=30, validation_data=(x_val, y_val_encoded))
+            history = conv2.fit(x_train, y_train_encoded, batch_size=256, epochs=5, validation_data=(x_val, y_val_encoded))
             print("training end!")
             loss, accuracy = conv2.evaluate(x_val, y_val_encoded, verbose=0)
             print(accuracy)
-
-            plt.plot(history.history['loss'])
-            plt.plot(history.history['val_loss'])
-            plt.ylabel('loss')
-            plt.xlabel('epoch')
-            plt.legend(['train_loss', 'val_loss'])
-            plt.grid(b=True, which='major', color='#666666', linestyle='-')
-            plt.minorticks_on()
-            plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-            plt.title("<LOSS: {:0.3f}> Layer {}, Channel {}, Ratio: {}".format(loss, Layer, Ch, ratio))
-            plt.savefig('ch08_loss{}_{}_{}.png'.format(Layer, Ch, ratio))
-            plt.clf()
-
-            plt.plot(history.history['accuracy'])
-            plt.plot(history.history['val_accuracy'])
-            plt.ylabel('accuracy')
-            plt.xlabel('epoch')
-            plt.legend(['train_accuracy', 'val_accuracy'])
-            plt.grid(b=True, which='major', color='#666666', linestyle='-')
-            plt.minorticks_on()
-            plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-            plt.title("<Accuracy: {:0.3f} > Layer {}, Channel {}, Ratio: {}".format(accuracy, Layer, Ch, ratio))
-            plt.savefig('ch08_acc{}_{}_{}.png'.format(Layer, Ch, ratio))
-            plt.clf()
+            prefix = 'testMod'
+            MakeFig(loss, accuracy, history, prefix)
+            #
+            # plt.plot(history.history['loss'])
+            # plt.plot(history.history['val_loss'])
+            # plt.ylabel('loss')
+            # plt.xlabel('epoch')
+            # plt.legend(['train_loss', 'val_loss'])
+            # plt.grid(b=True, which='major', color='#666666', linestyle='-')
+            # plt.minorticks_on()
+            # plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+            # plt.title("<LOSS: {:0.3f}> Layer {}, Channel {}, Ratio: {}".format(loss, Layer, Ch, ratio))
+            # plt.savefig('ch08_loss{}_{}_{}.png'.format(Layer, Ch, ratio))
+            # plt.clf()
+            #
+            # plt.plot(history.history['acc'])
+            # plt.plot(history.history['val_acc'])
+            # plt.ylabel('accuracy')
+            # plt.xlabel('epoch')
+            # plt.legend(['train_accuracy', 'val_accuracy'])
+            # plt.grid(b=True, which='major', color='#666666', linestyle='-')
+            # plt.minorticks_on()
+            # plt.grid(b=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
+            # plt.title("<Accuracy: {:0.3f} > Layer {}, Channel {}, Ratio: {}".format(accuracy, Layer, Ch, ratio))
+            # plt.savefig('ch08_acc{}_{}_{}.png'.format(Layer, Ch, ratio))
+            # plt.clf()
 

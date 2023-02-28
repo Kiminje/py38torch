@@ -21,11 +21,11 @@ import sys
 import numpy as np
 
 from docopt import docopt
-from Information_Retrieval.hw3.utils import batch_iter
-from Information_Retrieval.hw3.utils import read_corpus
-from Information_Retrieval.hw3.vocab import Vocab, VocabEntry
+from utils import batch_iter
+from utils import read_corpus
+from vocab import Vocab, VocabEntry
 
-from Information_Retrieval.hw3.nmt_model import NMT
+from nmt_model import NMT
 
 
 import torch
